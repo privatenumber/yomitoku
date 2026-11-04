@@ -202,6 +202,8 @@ The following items must match the pretrained weights and cannot be changed. Cha
 
 In addition, `num_parallel_batches` (the number of batches inferred in parallel) and `source_downscale` (whether to shrink high-resolution images before cropping) can be set only as `TextRecognizer` arguments.
 
+On MPS (Apple Silicon), two more `TextRecognizer` arguments default to `True`: `encoder_autocast` runs the image encoder under fp16 autocast, and `split_decode` runs the character-by-character decoding on the CPU while the encoder stays on MPS. Decoding is many small sequential steps, which run faster on the CPU. Set either to `False` to turn it off. Both default to `False` on other devices.
+
 ## Layout Parser / Table Structure Recognizer / Table Cell Parser
 
 For the layout and table models, the tunable item is the prediction score threshold `thresh_score`. Raising it keeps only confident regions; lowering it reduces misses but increases false detections.

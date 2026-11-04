@@ -82,6 +82,8 @@ class PARSeq(nn.Module, PyTorchModelHubMixin):
         nn.init.trunc_normal_(self.pos_queries, std=0.02)
 
         self.export_onnx = False
+        # Run the encoder under fp16 autocast (set by TextRecognizer).
+        self.encoder_autocast = False
 
         # Decode-time repetition early-stop. When the AR decoder enters a
         # degenerate loop (a period-p token unit repeated many times, the
@@ -135,7 +137,22 @@ class PARSeq(nn.Module, PyTorchModelHubMixin):
         return None
 
     def encode(self, img: torch.Tensor):
-        return self.encoder(img)
+        # The encoder can live on another device than the decoder (see
+        # TextRecognizer's split_decode); the memory is returned in fp32 on
+        # the decoder's device. Tensors move only when the devices differ, so
+        # the ONNX export does not trace identity casts.
+        device = next(self.encoder.parameters()).device
+        if img.device != device:
+            img = img.to(device)
+        with torch.autocast(
+            device.type, dtype=torch.float16, enabled=self.encoder_autocast
+        ):
+            memory = self.encoder(img)
+        if self.encoder_autocast:
+            memory = memory.float()
+        if memory.device != self._device:
+            memory = memory.to(self._device)
+        return memory
 
     def decode(
         self,

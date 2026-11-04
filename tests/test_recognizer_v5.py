@@ -3,8 +3,10 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
+import torch
 from omegaconf import OmegaConf
 
+from yomitoku import TextDetector
 from yomitoku.base import BaseModule
 from yomitoku.configs import (
     TextRecognizerPARSeqLargeV41Config,
@@ -15,6 +17,7 @@ from yomitoku.configs import (
 from yomitoku.data.dataset import ParseqDataset
 from yomitoku.data.functions import (
     calc_resize_without_padding,
+    load_image,
     resize_with_dynamic_padding,
 )
 from yomitoku.text_recognizer import TextRecognizer
@@ -119,6 +122,54 @@ def test_recognizer_runtime_resolves_config(monkeypatch, override, expected):
     assert rec.batch_bucketing is expected
     assert rec.nfkc_normalize is False
     assert "℡".translate(rec.char_replace_table) == "TEL"
+
+
+@pytest.mark.parametrize(
+    "device,override,expected",
+    [
+        ("mps", None, True),
+        ("mps", False, False),
+        ("cpu", None, False),
+        ("cpu", True, True),
+    ],
+)
+def test_mps_defaults_to_encoder_autocast_and_cpu_decode(
+    monkeypatch, device, override, expected
+):
+    cfg = OmegaConf.structured(TextRecognizerPARSeqTinyDynwV5Config)
+    monkeypatch.setattr(BaseModule, "__init__", lambda self, **kwargs: None)
+    monkeypatch.setattr("torch.backends.mps.is_available", lambda: True)
+    model = Mock()
+
+    def load(self, *args, **kwargs):
+        self._cfg = cfg
+        self.model = model
+
+    monkeypatch.setattr(TextRecognizer, "load_model", load)
+    rec = object.__new__(TextRecognizer)
+    TextRecognizer.__init__(
+        rec, device=device, encoder_autocast=override, split_decode=override
+    )
+    assert rec.encoder_autocast is expected
+    assert rec.split_decode is expected
+    assert model.encoder_autocast is expected
+    if expected:
+        model.to.assert_called_once_with("cpu")
+        model.encoder.to.assert_called_once_with(rec.device)
+    else:
+        model.to.assert_called_once_with(rec.device)
+
+
+@pytest.mark.skipif(
+    not torch.backends.mps.is_available(), reason="MPS is not available"
+)
+def test_mps_split_decode_matches_cpu():
+    img = load_image("tests/data/test.jpg")[0]
+    points = TextDetector(device="cpu")(img)[0].points
+    expected = TextRecognizer(device="cpu")(img, points)[0].contents
+    rec = TextRecognizer(device="mps")
+    assert rec.encoder_autocast and rec.split_decode
+    assert rec(img, points)[0].contents == expected
 
 
 def test_cpu_runs_mini_batches_in_parallel(monkeypatch):

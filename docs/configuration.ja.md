@@ -202,6 +202,8 @@ ocr.recognizer.log_config()             # OCR の場合
 
 このほか、`TextRecognizer` の引数でのみ指定できる項目として、`num_parallel_batches`（並列に推論するバッチ数）と `source_downscale`（切り出し前に高解像度の画像を縮小するかどうか）があります。
 
+MPS（Apple Silicon）では、さらに 2 つの `TextRecognizer` の引数が既定で `True` になります。`encoder_autocast` は画像エンコーダを fp16 の autocast で実行し、`split_decode` はエンコーダを MPS に置いたまま、1 文字ずつのデコードを CPU で実行します。デコードは小さな処理を順番に繰り返すため、CPU のほうが速く実行できます。無効にするには `False` を指定します。MPS 以外のデバイスでは、どちらも既定で `False` です。
+
 ## Layout Parser / Table Structure Recognizer / Table Cell Parser
 
 レイアウト・表に関するモデルで調整できるのは、予測スコアの閾値 `thresh_score` です。値を上げると確信度の高い領域だけが残り、下げると検出漏れが減る一方で誤検出が増えます。

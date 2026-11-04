@@ -75,6 +75,8 @@ class TextRecognizer(BaseModule):
         repetition_stop=None,
         num_parallel_batches=1,
         source_downscale=False,
+        encoder_autocast=None,
+        split_decode=None,
     ):
         super().__init__()
         self.load_model(
@@ -132,6 +134,14 @@ class TextRecognizer(BaseModule):
         # bounded by the smallest detected text height (the recognizer works
         # on 32px-tall crops, so extra source resolution is never used).
         self.source_downscale = source_downscale
+        # On MPS, the encoder runs faster under fp16 autocast, while the AR
+        # decode loop (many small sequential steps) is latency-bound and runs
+        # faster on the CPU. Unified memory keeps the hand-off cheap.
+        on_mps = self.device.type == "mps" and not infer_onnx
+        self.encoder_autocast = (
+            on_mps if encoder_autocast is None else bool(encoder_autocast)
+        )
+        self.split_decode = on_mps if split_decode is None else bool(split_decode)
 
         if infer_onnx:
             name = self._cfg.hf_hub_repo.split("/")[-1]
@@ -150,7 +160,14 @@ class TextRecognizer(BaseModule):
                 self.sess = onnxruntime.InferenceSession(model.SerializeToString())
 
         if self.model is not None:
-            self.model.to(self.device)
+            self.model.encoder_autocast = self.encoder_autocast
+            if self.split_decode:
+                # Only the encoder stays on self.device; PARSeq.encode moves
+                # the memory to the decoder's device.
+                self.model.to("cpu")
+                self.model.encoder.to(self.device)
+            else:
+                self.model.to(self.device)
 
     def preprocess(self, img, polygons):
         if polygons is None:
