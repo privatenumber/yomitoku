@@ -4,9 +4,9 @@ import re
 import time
 from pathlib import Path
 
-import torch
 from PIL import Image
 
+from ..base import resolve_device
 from ..constants import SUPPORT_OUTPUT_FORMAT
 from ..data.functions import load_image, load_pdf
 from ..document_analyzer import DocumentAnalyzer
@@ -568,7 +568,7 @@ def main():
         # smallest detected text height; crops are 32px tall anyway).
         configs["ocr"]["text_recognizer"]["source_downscale"] = True
 
-        if args.device == "cpu" or not torch.cuda.is_available():
+        if resolve_device(args.device).type == "cpu":
             configs["ocr"]["text_detector"]["infer_onnx"] = True
             # Run recognizer mini-batches concurrently on CPU (batches are
             # independent; outputs verified identical, ~1.3x on the recognizer).

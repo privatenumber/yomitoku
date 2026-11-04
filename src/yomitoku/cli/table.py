@@ -3,8 +3,7 @@ import os
 import time
 from pathlib import Path
 
-import torch
-
+from ..base import resolve_device
 from ..constants import ROOT_DIR, SUPPORT_INPUT_FORMAT
 from ..data.functions import load_image, load_pdf
 from ..studio_form_template import StudioFormTemplateParser
@@ -362,7 +361,7 @@ def main():
         configs["text_recognizer"]["batch_bucketing"] = True
         configs["text_recognizer"]["source_downscale"] = True
 
-        if args.device == "cpu" or not torch.cuda.is_available():
+        if resolve_device(args.device).type == "cpu":
             configs["text_detector"]["infer_onnx"] = True
             configs["text_recognizer"]["num_parallel_batches"] = 4
 

@@ -10,6 +10,39 @@ from yomitoku.cli.main import validate_encoding
 logger = set_logger(__name__, "DEBUG")
 
 
+@pytest.mark.parametrize(
+    "device,cuda,mps,cpu_inference",
+    [
+        ("cuda", True, True, False),
+        ("cuda", False, True, False),
+        ("mps", False, True, False),
+        ("cuda", False, False, True),
+        ("cpu", True, True, True),
+    ],
+)
+def test_lite_uses_cpu_settings_only_on_cpu(
+    monkeypatch, tmp_path, device, cuda, mps, cpu_inference
+):
+    input_path = tmp_path / "input.png"
+    input_path.touch()
+    monkeypatch.setattr("sys.argv", ["main.py", str(input_path), "-l", "-d", device])
+    monkeypatch.setattr("torch.cuda.is_available", lambda: cuda)
+    monkeypatch.setattr("torch.backends.mps.is_available", lambda: mps)
+
+    class Captured(Exception):
+        pass
+
+    def analyzer(**kwargs):
+        ocr = kwargs["configs"]["ocr"]
+        assert ocr["text_detector"].get("infer_onnx", False) is cpu_inference
+        assert ("num_parallel_batches" in ocr["text_recognizer"]) is cpu_inference
+        raise Captured
+
+    monkeypatch.setattr(main, "DocumentAnalyzer", analyzer)
+    with pytest.raises(Captured):
+        main.main()
+
+
 def test_run_not_exist(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "sys.argv",
