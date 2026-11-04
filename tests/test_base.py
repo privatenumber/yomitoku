@@ -7,9 +7,29 @@ from yomitoku.base import (
     BaseModule,
     load_config,
     load_yaml_config,
+    resolve_device,
 )
 from yomitoku.configs import LayoutParserRTDETRv2Config
 from yomitoku.models import RTDETRv2
+
+
+@pytest.mark.parametrize(
+    "requested,cuda,mps,expected",
+    [
+        ("cuda", True, True, "cuda"),
+        ("cuda", False, True, "mps"),
+        ("cuda", False, False, "cpu"),
+        ("mps", False, True, "mps"),
+        ("mps", False, False, "cpu"),
+        ("cpu", True, True, "cpu"),
+    ],
+)
+def test_resolve_device(requested, cuda, mps, expected):
+    with (
+        patch("torch.cuda.is_available", return_value=cuda),
+        patch("torch.backends.mps.is_available", return_value=mps),
+    ):
+        assert resolve_device(requested).type == expected
 
 
 def test_load_yaml_config():

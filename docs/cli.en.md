@@ -66,7 +66,7 @@ If `pdf` is specified, the system will recognize the text within the image using
 
 ## Specifying the Output Device
 
-You can specify the device for running the model using the -d or --device option. Supported options are cuda, cpu, and mps. If a GPU is not available, inference will be performed on the CPU. (Default: cuda)
+You can specify the device for running the model using the -d or --device option. Supported options are cuda, cpu, and mps. If CUDA is not available, inference runs on MPS (Apple Silicon) when available, otherwise on the CPU. (Default: cuda)
 
 ```bash
 yomitoku ${path_data} -d cpu

@@ -63,7 +63,7 @@ yomitoku ${path_data} -f md
 
 ## 出力デバイスの指定
 
-`-d`, `--device` オプションを使用することで、モデルを実行するためのデバイスを指定します。(cuda | cpu | mps)。gpu が利用できない場合は cpu で推論が実行されます。(デフォルト: cuda)
+`-d`, `--device` オプションを使用することで、モデルを実行するためのデバイスを指定します。(cuda | cpu | mps)。cuda が利用できない場合は、mps（Apple Silicon）が利用可能なら mps、そうでなければ cpu で推論が実行されます。(デフォルト: cuda)
 
 ```bash
 yomitoku ${path_data} -d cpu

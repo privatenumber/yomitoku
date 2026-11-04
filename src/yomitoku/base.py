@@ -33,6 +33,26 @@ def load_config(
     return cfg
 
 
+def resolve_device(device):
+    """Map a requested device to an available one.
+
+    An unavailable CUDA device falls back to MPS when available, then CPU.
+    """
+    if "cuda" in device:
+        if torch.cuda.is_available():
+            return torch.device(device)
+        if torch.backends.mps.is_available():
+            logger.warning("CUDA is not available. Use MPS instead.")
+            return torch.device("mps")
+        logger.warning("CUDA is not available. Use CPU instead.")
+        return torch.device("cpu")
+    if "mps" in device:
+        if torch.backends.mps.is_available():
+            return torch.device("mps")
+        logger.warning("MPS is not available. Use CPU instead.")
+    return torch.device("cpu")
+
+
 def observer(cls, func):
     def wrapper(*args, **kwargs):
         try:
@@ -103,20 +123,7 @@ class BaseModule:
 
     @device.setter
     def device(self, device):
-        if "cuda" in device:
-            if torch.cuda.is_available():
-                self._device = torch.device(device)
-            else:
-                self._device = torch.device("cpu")
-                logger.warning("CUDA is not available. Use CPU instead.")
-        elif "mps" in device:
-            if torch.backends.mps.is_available():
-                self._device = torch.device("mps")
-            else:
-                self._device = torch.device("cpu")
-                logger.warning("MPS is not available. Use CPU instead.")
-        else:
-            self._device = torch.device("cpu")
+        self._device = resolve_device(device)
 
 
 class BaseModelCatalog:
